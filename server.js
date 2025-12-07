@@ -7,6 +7,12 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+// Set server timezone to IST for consistent date handling
+process.env.TZ = 'Asia/Kolkata';
+
+// Import timezone utilities
+const { logWithISTTime } = require('./utils/timezone');
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const storyRoutes = require('./routes/stories');
@@ -69,7 +75,7 @@ mongoose.connect(process.env.MONGODB_URI, {
   useUnifiedTopology: true,
 })
 .then(() => {
-  console.log('Connected to MongoDB');
+  logWithISTTime('Connected to MongoDB');
   // Initialize scheduler after DB connection
   initializeScheduler();
   // Initialize server pinger to keep server alive
@@ -88,10 +94,18 @@ app.use('/api/admin', adminRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
+  const { getCurrentUTCTime, formatDateTimeIST } = require('./utils/timezone');
+  const now = getCurrentUTCTime();
+  
   res.json({ 
     status: 'OK', 
     message: 'StoryHub API is running',
-    timestamp: new Date().toISOString()
+    timestamp: now.toISOString(),
+    serverTime: {
+      utc: now.toISOString(),
+      ist: formatDateTimeIST(now)
+    },
+    timezone: process.env.TZ || 'UTC'
   });
 });
 
@@ -123,6 +137,7 @@ process.on('SIGTERM', async () => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  logWithISTTime(`Server running on port ${PORT}`);
+  logWithISTTime(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  logWithISTTime(`Server timezone set to: ${process.env.TZ}`);
 });

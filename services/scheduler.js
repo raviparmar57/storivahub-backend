@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const Story = require('../models/Story');
 const { SocialMediaScheduler } = require('./socialMedia');
+const { getCurrentUTCTime, isScheduledTimeReached, logWithISTTime, formatDateTimeIST } = require('../utils/timezone');
 
 class PostScheduler {
   constructor() {
@@ -23,12 +24,13 @@ class PostScheduler {
       }
     });
 
-    console.log('Post scheduler initialized');
+    logWithISTTime('Post scheduler initialized');
   }
 
   async processScheduledPosts() {
     try {
-      const now = new Date();
+      const now = getCurrentUTCTime();
+      logWithISTTime('Processing scheduled posts...', `Current UTC: ${now.toISOString()}`, `Current IST: ${formatDateTimeIST(now)}`);
       
       // Find stories that are scheduled to be published
       const scheduledStories = await Story.find({
@@ -63,6 +65,8 @@ class PostScheduler {
         ]
       });
 
+      logWithISTTime(`Found ${storiesWithScheduledPosts.length} stories with scheduled social media posts`);
+      
       for (const story of storiesWithScheduledPosts) {
         await this.postToSocialMedia(story);
       }
@@ -115,8 +119,9 @@ class PostScheduler {
 
       // Post to Facebook if scheduled
       if (story.socialMediaPosts.facebook.scheduledTime && 
-          story.socialMediaPosts.facebook.scheduledTime <= now && 
+          isScheduledTimeReached(story.socialMediaPosts.facebook.scheduledTime) && 
           !story.socialMediaPosts.facebook.posted) {
+        logWithISTTime(`Posting to Facebook - Scheduled: ${formatDateTimeIST(story.socialMediaPosts.facebook.scheduledTime)}, Current: ${formatDateTimeIST(now)}`);
         results.facebook = await this.scheduler.facebook.postVideo(
           videoData.videoUrl, 
           videoData.caption, 
@@ -127,8 +132,9 @@ class PostScheduler {
 
       // Post to Instagram if scheduled
       if (story.socialMediaPosts.instagram.scheduledTime && 
-          story.socialMediaPosts.instagram.scheduledTime <= now && 
+          isScheduledTimeReached(story.socialMediaPosts.instagram.scheduledTime) && 
           !story.socialMediaPosts.instagram.posted) {
+        logWithISTTime(`Posting to Instagram - Scheduled: ${formatDateTimeIST(story.socialMediaPosts.instagram.scheduledTime)}, Current: ${formatDateTimeIST(now)}`);
         results.instagram = await this.scheduler.instagram.postVideo(
           videoData.videoUrl, 
           videoData.caption, 
@@ -139,8 +145,9 @@ class PostScheduler {
 
       // Post to Twitter if scheduled
       if (story.socialMediaPosts.twitter.scheduledTime && 
-          story.socialMediaPosts.twitter.scheduledTime <= now && 
+          isScheduledTimeReached(story.socialMediaPosts.twitter.scheduledTime) && 
           !story.socialMediaPosts.twitter.posted) {
+        logWithISTTime(`Posting to Twitter - Scheduled: ${formatDateTimeIST(story.socialMediaPosts.twitter.scheduledTime)}, Current: ${formatDateTimeIST(now)}`);
         results.twitter = await this.scheduler.twitter.postVideo(
           videoData.videoUrl, 
           videoData.caption, 
@@ -151,8 +158,9 @@ class PostScheduler {
 
       // Post to YouTube if scheduled
       if (story.socialMediaPosts.youtube.scheduledTime && 
-          story.socialMediaPosts.youtube.scheduledTime <= now && 
+          isScheduledTimeReached(story.socialMediaPosts.youtube.scheduledTime) && 
           !story.socialMediaPosts.youtube.posted) {
+        logWithISTTime(`Posting to YouTube - Scheduled: ${formatDateTimeIST(story.socialMediaPosts.youtube.scheduledTime)}, Current: ${formatDateTimeIST(now)}`);
         results.youtube = await this.scheduler.youtube.uploadVideo(
           videoData.videoUrl, 
           videoData.title, 
@@ -270,7 +278,7 @@ class PostScheduler {
       }
 
       await story.save();
-      console.log(`Social media posting completed for story: ${story.title}`);
+      logWithISTTime(`Social media posting completed for story: ${story.title}`);
 
     } catch (error) {
       console.error(`Error posting to social media for story ${story.title}:`, error);
