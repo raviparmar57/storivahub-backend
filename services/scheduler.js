@@ -106,7 +106,9 @@ class PostScheduler {
           story.socialMediaPosts.facebook.postId = results.facebook.postId;
         }
         if (!results.facebook.success) {
-          story.socialMediaPosts.facebook.error = results.facebook.error;
+          story.socialMediaPosts.facebook.error = typeof results.facebook.error === 'string' 
+            ? results.facebook.error 
+            : JSON.stringify(results.facebook.error);
         }
       }
 
@@ -119,7 +121,9 @@ class PostScheduler {
           story.socialMediaPosts.instagram.postId = results.instagram.postId;
         }
         if (!results.instagram.success) {
-          story.socialMediaPosts.instagram.error = results.instagram.error;
+          story.socialMediaPosts.instagram.error = typeof results.instagram.error === 'string' 
+            ? results.instagram.error 
+            : JSON.stringify(results.instagram.error);
         }
       }
 
@@ -132,7 +136,9 @@ class PostScheduler {
           story.socialMediaPosts.twitter.postId = results.twitter.postId;
         }
         if (!results.twitter.success) {
-          story.socialMediaPosts.twitter.error = results.twitter.error;
+          story.socialMediaPosts.twitter.error = typeof results.twitter.error === 'string' 
+            ? results.twitter.error 
+            : JSON.stringify(results.twitter.error);
         }
       }
 
@@ -145,7 +151,9 @@ class PostScheduler {
           story.socialMediaPosts.youtube.videoId = results.youtube.videoId;
         }
         if (!results.youtube.success) {
-          story.socialMediaPosts.youtube.error = results.youtube.error;
+          story.socialMediaPosts.youtube.error = typeof results.youtube.error === 'string' 
+            ? results.youtube.error 
+            : JSON.stringify(results.youtube.error);
         }
       }
 

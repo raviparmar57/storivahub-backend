@@ -41,7 +41,11 @@ class FacebookAPI {
       return { success: true, postId };
     } catch (error) {
       console.error('Facebook post error:', error);
-      return { success: false, error: error.response?.data || error.message };
+      const errorMessage = error.response?.data?.error?.message || 
+                           error.response?.data?.message || 
+                           error.message || 
+                           'Unknown Facebook API error';
+      return { success: false, error: errorMessage };
     }
   }
 }
@@ -58,7 +62,8 @@ class InstagramAPI {
       const createResponse = await axios.post(
         `https://graph.facebook.com/v18.0/${process.env.INSTAGRAM_ACCOUNT_ID}/media`,
         {
-          video_url: videoUrl,
+          image_url: videoUrl,  // Instagram API uses image_url for both images and videos
+          media_type: 'VIDEO',   // Specify that this is a video
           caption: `${caption}\n\n${hashtags.map(tag => `#${tag}`).join(' ')}`
         },
         {
@@ -86,7 +91,11 @@ class InstagramAPI {
       return { success: true, postId: publishResponse.data.id, firstComment };
     } catch (error) {
       console.error('Instagram post error:', error);
-      return { success: false, error: error.response?.data || error.message };
+      const errorMessage = error.response?.data?.error?.message || 
+                           error.response?.data?.message || 
+                           error.message || 
+                           'Unknown Instagram API error';
+      return { success: false, error: errorMessage };
     }
   }
 }
