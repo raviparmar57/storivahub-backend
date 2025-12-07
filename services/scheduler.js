@@ -94,13 +94,66 @@ class PostScheduler {
         title: story.title
       };
 
-      const results = await this.scheduler.postToAllPlatforms(videoData);
       const now = new Date();
+      const results = {
+        facebook: null,
+        instagram: null,
+        twitter: null,
+        youtube: null
+      };
 
-      // Update Facebook posting status
+      // Only post to platforms that are scheduled for this time and haven't been posted yet
+
+      // Post to Facebook if scheduled
       if (story.socialMediaPosts.facebook.scheduledTime && 
           story.socialMediaPosts.facebook.scheduledTime <= now && 
           !story.socialMediaPosts.facebook.posted) {
+        results.facebook = await this.scheduler.facebook.postVideo(
+          videoData.videoUrl, 
+          videoData.caption, 
+          videoData.hashtags, 
+          videoData.firstComment
+        );
+      }
+
+      // Post to Instagram if scheduled
+      if (story.socialMediaPosts.instagram.scheduledTime && 
+          story.socialMediaPosts.instagram.scheduledTime <= now && 
+          !story.socialMediaPosts.instagram.posted) {
+        results.instagram = await this.scheduler.instagram.postVideo(
+          videoData.videoUrl, 
+          videoData.caption, 
+          videoData.hashtags, 
+          videoData.firstComment
+        );
+      }
+
+      // Post to Twitter if scheduled
+      if (story.socialMediaPosts.twitter.scheduledTime && 
+          story.socialMediaPosts.twitter.scheduledTime <= now && 
+          !story.socialMediaPosts.twitter.posted) {
+        results.twitter = await this.scheduler.twitter.postVideo(
+          videoData.videoUrl, 
+          videoData.caption, 
+          videoData.hashtags, 
+          videoData.firstComment
+        );
+      }
+
+      // Post to YouTube if scheduled
+      if (story.socialMediaPosts.youtube.scheduledTime && 
+          story.socialMediaPosts.youtube.scheduledTime <= now && 
+          !story.socialMediaPosts.youtube.posted) {
+        results.youtube = await this.scheduler.youtube.uploadVideo(
+          videoData.videoUrl, 
+          videoData.title, 
+          videoData.caption, 
+          videoData.hashtags
+        );
+      }
+
+      // Update Facebook posting status
+      if (results.facebook) {
         story.socialMediaPosts.facebook.posted = results.facebook.success;
         if (results.facebook.postId) {
           story.socialMediaPosts.facebook.postId = results.facebook.postId;
@@ -113,9 +166,7 @@ class PostScheduler {
       }
 
       // Update Instagram posting status
-      if (story.socialMediaPosts.instagram.scheduledTime && 
-          story.socialMediaPosts.instagram.scheduledTime <= now && 
-          !story.socialMediaPosts.instagram.posted) {
+      if (results.instagram) {
         story.socialMediaPosts.instagram.posted = results.instagram.success;
         if (results.instagram.postId) {
           story.socialMediaPosts.instagram.postId = results.instagram.postId;
@@ -128,9 +179,7 @@ class PostScheduler {
       }
 
       // Update Twitter posting status
-      if (story.socialMediaPosts.twitter.scheduledTime && 
-          story.socialMediaPosts.twitter.scheduledTime <= now && 
-          !story.socialMediaPosts.twitter.posted) {
+      if (results.twitter) {
         story.socialMediaPosts.twitter.posted = results.twitter.success;
         if (results.twitter.postId) {
           story.socialMediaPosts.twitter.postId = results.twitter.postId;
@@ -143,9 +192,7 @@ class PostScheduler {
       }
 
       // Update YouTube posting status
-      if (story.socialMediaPosts.youtube.scheduledTime && 
-          story.socialMediaPosts.youtube.scheduledTime <= now && 
-          !story.socialMediaPosts.youtube.posted) {
+      if (results.youtube) {
         story.socialMediaPosts.youtube.posted = results.youtube.success;
         if (results.youtube.videoId) {
           story.socialMediaPosts.youtube.videoId = results.youtube.videoId;
