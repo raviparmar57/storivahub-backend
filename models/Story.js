@@ -45,13 +45,17 @@ const storySchema = new mongoose.Schema({
       postId: String,
       posted: { type: Boolean, default: false },
       scheduledTime: Date,
-      error: String
+      error: String,
+      commentId: String,
+      commentError: String
     },
     instagram: {
       postId: String,
       posted: { type: Boolean, default: false },
       scheduledTime: Date,
-      error: String
+      error: String,
+      commentId: String,
+      commentError: String
     },
     twitter: {
       postId: String,

@@ -9,7 +9,7 @@ class FacebookAPI {
   async postVideo(videoUrl, caption, hashtags, firstComment) {
     try {
       const response = await axios.post(
-        `https://graph.facebook.com/v18.0/${process.env.FACEBOOK_PAGE_ID}/videos`,
+        `https://graph.facebook.com/v24.0/${process.env.FACEBOOK_PAGE_ID}/videos`,
         {
           file_url: videoUrl,
           description: `${caption}\n\n${hashtags.map(tag => `#${tag}`).join(' ')}`
@@ -22,23 +22,14 @@ class FacebookAPI {
       );
 
       const postId = response.data.id;
+      console.log('Facebook post created with ID:', postId);
 
-      // Add first comment
-      if (firstComment) {
-        await axios.post(
-          `https://graph.facebook.com/v18.0/${postId}/comments`,
-          {
-            message: firstComment
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${this.accessToken}`
-            }
-          }
-        );
-      }
-
-      return { success: true, postId };
+      return { 
+        success: true, 
+        postId, 
+        needsComment: !!firstComment,
+        firstComment: firstComment 
+      };
     } catch (error) {
       console.error('Facebook post error:', error);
       const errorMessage = error.response?.data?.error?.message || 
@@ -46,6 +37,59 @@ class FacebookAPI {
                            error.message || 
                            'Unknown Facebook API error';
       return { success: false, error: errorMessage };
+    }
+  }
+
+  async postComment(postId, comment) {
+    try {
+      console.log('Adding Facebook comment to post:', postId);
+      console.log('Comment text:', comment);
+      
+      // Try using the page ID instead of post ID for commenting
+      const pageId = process.env.FACEBOOK_PAGE_ID;
+      
+      const response = await axios.post(
+        `https://graph.facebook.com/v24.0/${pageId}_${postId}/comments`,
+        {
+          message: comment
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.accessToken}`
+          }
+        }
+      );
+      
+      console.log('Facebook comment added successfully:', response.data);
+      return { success: true, commentId: response.data.id };
+    } catch (error) {
+      console.error('Failed to add Facebook comment:', error.response?.data || error.message);
+      
+      // Try alternative approach - using just the post ID
+      try {
+        console.log('Retrying with alternative post ID format...');
+        const retryResponse = await axios.post(
+          `https://graph.facebook.com/v24.0/${postId}/comments`,
+          {
+            message: comment
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${this.accessToken}`
+            }
+          }
+        );
+        
+        console.log('Facebook comment added successfully on retry:', retryResponse.data);
+        return { success: true, commentId: retryResponse.data.id };
+      } catch (retryError) {
+        console.error('Failed to add Facebook comment on retry:', retryError.response?.data || retryError.message);
+        const errorMessage = error.response?.data?.error?.message || 
+                             error.response?.data?.message || 
+                             error.message || 
+                             'Failed to add comment - permissions error';
+        return { success: false, error: errorMessage };
+      }
     }
   }
 }
@@ -58,12 +102,12 @@ class InstagramAPI {
 
   async postVideo(videoUrl, caption, hashtags, firstComment) {
     try {
-      // Create media object
+      // Create media container for Instagram Reel
       const createResponse = await axios.post(
-        `https://graph.facebook.com/v18.0/${process.env.INSTAGRAM_ACCOUNT_ID}/media`,
+        `https://graph.facebook.com/v24.0/${process.env.INSTAGRAM_ACCOUNT_ID}/media`,
         {
-          image_url: videoUrl,  // Instagram API uses image_url for both images and videos
-          media_type: 'VIDEO',   // Specify that this is a video
+          media_type: "REELS",  // Specify this is a Reel
+          video_url: videoUrl,
           caption: `${caption}\n\n${hashtags.map(tag => `#${tag}`).join(' ')}`
         },
         {
@@ -74,10 +118,20 @@ class InstagramAPI {
       );
 
       const creationId = createResponse.data.id;
+      console.log('Instagram Reel container created with ID:', creationId);
+
+      // Wait for media container to finish processing
+      console.log('Waiting for Instagram media container to finish processing...');
+      const isReady = await this.waitForMediaReady(creationId);
+      
+      if (!isReady) {
+        throw new Error('Media container failed to process or timed out');
+      }
 
       // Publish the media
+      console.log('Media container ready, publishing Instagram Reel...');
       const publishResponse = await axios.post(
-        `https://graph.facebook.com/v18.0/${process.env.INSTAGRAM_ACCOUNT_ID}/media_publish`,
+        `https://graph.facebook.com/v24.0/${process.env.INSTAGRAM_ACCOUNT_ID}/media_publish`,
         {
           creation_id: creationId
         },
@@ -88,13 +142,97 @@ class InstagramAPI {
         }
       );
 
-      return { success: true, postId: publishResponse.data.id, firstComment };
+      console.log('Instagram Reel published successfully with ID:', publishResponse.data.id);
+      return { 
+        success: true, 
+        postId: publishResponse.data.id, 
+        needsComment: !!firstComment,
+        firstComment: firstComment 
+      };
     } catch (error) {
       console.error('Instagram post error:', error);
       const errorMessage = error.response?.data?.error?.message || 
                            error.response?.data?.message || 
                            error.message || 
                            'Unknown Instagram API error';
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  async waitForMediaReady(creationId, maxRetries = 30, retryDelay = 10000) {
+    try {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        console.log(`Checking media container status (attempt ${attempt}/${maxRetries})...`);
+        
+        const statusResponse = await axios.get(
+          `https://graph.facebook.com/v24.0/${creationId}`,
+          {
+            params: {
+              fields: 'status_code,status'
+            },
+            headers: {
+              'Authorization': `Bearer ${this.accessToken}`
+            }
+          }
+        );
+
+        const status = statusResponse.data.status_code || statusResponse.data.status;
+        console.log(`Media container status: ${status}`);
+
+        if (status === 'FINISHED') {
+          console.log('✅ Media container processing completed successfully!');
+          return true;
+        }
+
+        if (status === 'ERROR' || status === 'EXPIRED') {
+          console.error(`❌ Media container processing failed with status: ${status}`);
+          return false;
+        }
+
+        if (status === 'IN_PROGRESS' || status === 'PUBLISHED') {
+          console.log(`⏳ Media container still processing... waiting ${retryDelay/1000}s`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
+        }
+
+        console.log(`⚠️  Unknown status: ${status}, continuing to wait...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+
+      console.error('❌ Timeout: Media container did not finish processing within time limit');
+      return false;
+    } catch (error) {
+      console.error('Error checking media container status:', error.response?.data || error.message);
+      return false;
+    }
+  }
+
+  async postComment(postId, comment) {
+    try {
+      console.log('Adding Instagram comment to post:', postId);
+      console.log('Comment text:', comment);
+      
+      const response = await axios.post(
+        `https://graph.facebook.com/v24.0/${postId}/comments`,
+        {
+          message: comment
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      console.log('Instagram comment added successfully:', response.data);
+      return { success: true, commentId: response.data.id };
+    } catch (error) {
+      console.error('Failed to add Instagram comment:', error.response?.data || error.message);
+      const errorMessage = error.response?.data?.error?.message || 
+                           error.response?.data?.message || 
+                           error.message || 
+                           'Failed to add Instagram comment';
       return { success: false, error: errorMessage };
     }
   }

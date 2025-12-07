@@ -86,13 +86,22 @@ class PostScheduler {
     if (!story.video) return;
 
     try {
+      // Generate auto first comment if not present
+      const generateFirstComment = (storyId) => {
+        const baseUrl = process.env.FRONTEND_URL || 'https://storivahub.vercel.app';
+        return `FULL STORY 👇👇👇 ${baseUrl}/s/${storyId}`;
+      };
+
       const videoData = {
         videoUrl: story.video.url,
         caption: story.video.caption || story.title,
         hashtags: story.video.hashtags || [],
-        firstComment: story.video.firstComment || '',
+        firstComment: story.video.firstComment || generateFirstComment(story._id),
         title: story.title
       };
+
+      console.log('Posting to social media for story:', story.title);
+      console.log('Video data:', JSON.stringify(videoData, null, 2));
 
       const now = new Date();
       const results = {
@@ -157,6 +166,34 @@ class PostScheduler {
         story.socialMediaPosts.facebook.posted = results.facebook.success;
         if (results.facebook.postId) {
           story.socialMediaPosts.facebook.postId = results.facebook.postId;
+          
+          // Post comment if needed
+          if (results.facebook.success && results.facebook.needsComment && results.facebook.firstComment) {
+            console.log('Scheduling Facebook comment for post:', results.facebook.postId);
+            
+            // Post comment after a short delay to ensure post is processed
+            setTimeout(async () => {
+              try {
+                const commentResult = await this.scheduler.facebook.postComment(
+                  results.facebook.postId, 
+                  results.facebook.firstComment
+                );
+                
+                if (commentResult.success) {
+                  console.log('Facebook comment posted successfully');
+                  // Update story with comment ID if needed
+                  story.socialMediaPosts.facebook.commentId = commentResult.commentId;
+                  await story.save();
+                } else {
+                  console.error('Failed to post Facebook comment:', commentResult.error);
+                  story.socialMediaPosts.facebook.commentError = commentResult.error;
+                  await story.save();
+                }
+              } catch (commentError) {
+                console.error('Error posting Facebook comment:', commentError);
+              }
+            }, 10000); // 10 second delay
+          }
         }
         if (!results.facebook.success) {
           story.socialMediaPosts.facebook.error = typeof results.facebook.error === 'string' 
@@ -170,6 +207,34 @@ class PostScheduler {
         story.socialMediaPosts.instagram.posted = results.instagram.success;
         if (results.instagram.postId) {
           story.socialMediaPosts.instagram.postId = results.instagram.postId;
+          
+          // Post comment if needed
+          if (results.instagram.success && results.instagram.needsComment && results.instagram.firstComment) {
+            console.log('Scheduling Instagram comment for post:', results.instagram.postId);
+            
+            // Post comment after a 10 second delay
+            setTimeout(async () => {
+              try {
+                const commentResult = await this.scheduler.instagram.postComment(
+                  results.instagram.postId, 
+                  results.instagram.firstComment
+                );
+                
+                if (commentResult.success) {
+                  console.log('Instagram comment posted successfully');
+                  // Update story with comment ID if needed
+                  story.socialMediaPosts.instagram.commentId = commentResult.commentId;
+                  await story.save();
+                } else {
+                  console.error('Failed to post Instagram comment:', commentResult.error);
+                  story.socialMediaPosts.instagram.commentError = commentResult.error;
+                  await story.save();
+                }
+              } catch (commentError) {
+                console.error('Error posting Instagram comment:', commentError);
+              }
+            }, 10000); // 10 second delay
+          }
         }
         if (!results.instagram.success) {
           story.socialMediaPosts.instagram.error = typeof results.instagram.error === 'string' 

@@ -2,6 +2,7 @@ const express = require('express');
 const Story = require('../models/Story');
 const User = require('../models/User');
 const { requireAdmin } = require('../middleware/auth');
+const { getPingerStats } = require('../services/serverPinger');
 
 const router = express.Router();
 
@@ -264,6 +265,24 @@ router.get('/analytics', requireAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching analytics:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get server pinger status
+router.get('/pinger-status', requireAdmin, async (req, res) => {
+  try {
+    const pingerStats = getPingerStats();
+    
+    res.json({
+      success: true,
+      pinger: pingerStats || {
+        isEnabled: false,
+        message: 'Pinger not initialized'
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching pinger status:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

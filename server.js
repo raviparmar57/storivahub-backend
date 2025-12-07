@@ -13,8 +13,9 @@ const storyRoutes = require('./routes/stories');
 const uploadRoutes = require('./routes/upload');
 const adminRoutes = require('./routes/admin');
 
-// Import scheduler
+// Import scheduler and pinger
 const { initializeScheduler } = require('./services/scheduler');
+const { initializePinger } = require('./services/serverPinger');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -71,6 +72,8 @@ mongoose.connect(process.env.MONGODB_URI, {
   console.log('Connected to MongoDB');
   // Initialize scheduler after DB connection
   initializeScheduler();
+  // Initialize server pinger to keep server alive
+  initializePinger();
 })
 .catch((error) => {
   console.error('MongoDB connection error:', error);
