@@ -10,8 +10,8 @@ class PostScheduler {
   }
 
   init() {
-    // Run every hour to check for scheduled posts
-    cron.schedule('0 * * * *', async () => {
+    // Run every minute to check for scheduled posts
+    cron.schedule('* * * * *', async () => {
       if (this.isRunning) return;
       this.isRunning = true;
 
@@ -53,14 +53,6 @@ class PostScheduler {
           { 
             'socialMediaPosts.instagram.scheduledTime': { $lte: now }, 
             'socialMediaPosts.instagram.posted': false 
-          },
-          { 
-            'socialMediaPosts.twitter.scheduledTime': { $lte: now }, 
-            'socialMediaPosts.twitter.posted': false 
-          },
-          { 
-            'socialMediaPosts.youtube.scheduledTime': { $lte: now }, 
-            'socialMediaPosts.youtube.posted': false 
           }
         ]
       });
@@ -110,9 +102,7 @@ class PostScheduler {
       const now = new Date();
       const results = {
         facebook: null,
-        instagram: null,
-        twitter: null,
-        youtube: null
+        instagram: null
       };
 
       // Only post to platforms that are scheduled for this time and haven't been posted yet
@@ -143,35 +133,14 @@ class PostScheduler {
         );
       }
 
-      // Post to Twitter if scheduled
-      if (story.socialMediaPosts.twitter.scheduledTime && 
-          isScheduledTimeReached(story.socialMediaPosts.twitter.scheduledTime) && 
-          !story.socialMediaPosts.twitter.posted) {
-        logWithISTTime(`Posting to Twitter - Scheduled: ${formatDateTimeIST(story.socialMediaPosts.twitter.scheduledTime)}, Current: ${formatDateTimeIST(now)}`);
-        results.twitter = await this.scheduler.twitter.postVideo(
-          videoData.videoUrl, 
-          videoData.caption, 
-          videoData.hashtags, 
-          videoData.firstComment
-        );
-      }
-
-      // Post to YouTube if scheduled
-      if (story.socialMediaPosts.youtube.scheduledTime && 
-          isScheduledTimeReached(story.socialMediaPosts.youtube.scheduledTime) && 
-          !story.socialMediaPosts.youtube.posted) {
-        logWithISTTime(`Posting to YouTube - Scheduled: ${formatDateTimeIST(story.socialMediaPosts.youtube.scheduledTime)}, Current: ${formatDateTimeIST(now)}`);
-        results.youtube = await this.scheduler.youtube.uploadVideo(
-          videoData.videoUrl, 
-          videoData.title, 
-          videoData.caption, 
-          videoData.hashtags
-        );
-      }
+      // Twitter and YouTube removed
 
       // Update Facebook posting status
       if (results.facebook) {
         story.socialMediaPosts.facebook.posted = results.facebook.success;
+        if (results.facebook.success) {
+          story.socialMediaPosts.facebook.postedAt = new Date(); // Record actual posting time
+        }
         if (results.facebook.postId) {
           story.socialMediaPosts.facebook.postId = results.facebook.postId;
           
@@ -215,6 +184,9 @@ class PostScheduler {
       // Update Instagram posting status
       if (results.instagram) {
         story.socialMediaPosts.instagram.posted = results.instagram.success;
+        if (results.instagram.success) {
+          story.socialMediaPosts.instagram.postedAt = new Date(); // Record actual posting time
+        }
         if (results.instagram.postId) {
           story.socialMediaPosts.instagram.postId = results.instagram.postId;
           
@@ -255,31 +227,7 @@ class PostScheduler {
         }
       }
 
-      // Update Twitter posting status
-      if (results.twitter) {
-        story.socialMediaPosts.twitter.posted = results.twitter.success;
-        if (results.twitter.postId) {
-          story.socialMediaPosts.twitter.postId = results.twitter.postId;
-        }
-        if (!results.twitter.success) {
-          story.socialMediaPosts.twitter.error = typeof results.twitter.error === 'string' 
-            ? results.twitter.error 
-            : JSON.stringify(results.twitter.error);
-        }
-      }
-
-      // Update YouTube posting status
-      if (results.youtube) {
-        story.socialMediaPosts.youtube.posted = results.youtube.success;
-        if (results.youtube.videoId) {
-          story.socialMediaPosts.youtube.videoId = results.youtube.videoId;
-        }
-        if (!results.youtube.success) {
-          story.socialMediaPosts.youtube.error = typeof results.youtube.error === 'string' 
-            ? results.youtube.error 
-            : JSON.stringify(results.youtube.error);
-        }
-      }
+      // Twitter and YouTube status updates removed
 
       await story.save();
       logWithISTTime(`Social media posting completed for story: ${story.title}`);

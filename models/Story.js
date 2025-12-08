@@ -8,14 +8,23 @@ const storySchema = new mongoose.Schema({
     trim: true,
     maxlength: 200
   },
+  excerpt: {
+    type: String,
+    trim: true,
+    maxlength: 500
+  },
   content: {
     type: String,
     required: true,
     trim: true
   },
+  isFeatured: {
+    type: Boolean,
+    default: false
+  },
   image: {
-    url: { type: String, required: true },
-    publicId: { type: String, required: true },
+    url: { type: String, required: false },
+    publicId: { type: String, required: false },
     width: Number,
     height: Number
   },
@@ -44,30 +53,22 @@ const storySchema = new mongoose.Schema({
     facebook: {
       postId: String,
       posted: { type: Boolean, default: false },
+      postedAt: Date, // Track actual posting time
       scheduledTime: Date,
       error: String,
+      failed: { type: Boolean, default: false },
       commentId: String,
       commentError: String
     },
     instagram: {
       postId: String,
       posted: { type: Boolean, default: false },
+      postedAt: Date, // Track actual posting time
       scheduledTime: Date,
       error: String,
+      failed: { type: Boolean, default: false },
       commentId: String,
       commentError: String
-    },
-    twitter: {
-      postId: String,
-      posted: { type: Boolean, default: false },
-      scheduledTime: Date,
-      error: String
-    },
-    youtube: {
-      videoId: String,
-      posted: { type: Boolean, default: false },
-      scheduledTime: Date,
-      error: String
     }
   },
   views: {
@@ -91,9 +92,11 @@ const storySchema = new mongoose.Schema({
 // Create indexes for performance
 storySchema.index({ slug: 1 });
 storySchema.index({ isPublished: 1, createdAt: -1 });
+storySchema.index({ isPublished: 1, isFeatured: 1, createdAt: -1 });
 storySchema.index({ scheduledDate: 1 });
 storySchema.index({ tags: 1 });
-storySchema.index({ title: 'text', content: 'text' });
+storySchema.index({ views: -1 });
+storySchema.index({ title: 'text', content: 'text', excerpt: 'text' });
 storySchema.index({ 'socialMediaPosts.facebook.scheduledTime': 1 });
 storySchema.index({ 'socialMediaPosts.instagram.scheduledTime': 1 });
 storySchema.index({ 'socialMediaPosts.twitter.scheduledTime': 1 });
@@ -142,13 +145,13 @@ storySchema.pre('save', async function(next) {
   }
 });
 
-// Virtual for excerpt
-storySchema.virtual('excerpt').get(function() {
-  if (!this.content) {
-    return '';
+// Auto-generate excerpt from content if not provided
+storySchema.pre('save', function(next) {
+  if (!this.excerpt && this.content) {
+    const plainText = this.content.replace(/<[^>]*>/g, '');
+    this.excerpt = plainText.length > 200 ? plainText.substring(0, 200) + '...' : plainText;
   }
-  const plainText = this.content.replace(/<[^>]*>/g, '');
-  return plainText.length > 200 ? plainText.substring(0, 200) + '...' : plainText;
+  next();
 });
 
 // Include virtuals in JSON
