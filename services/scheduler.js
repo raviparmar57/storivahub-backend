@@ -10,8 +10,8 @@ class PostScheduler {
   }
 
   init() {
-    // Run every minute to check for scheduled posts
-    cron.schedule('* * * * *', async () => {
+    // Run every hour to check for scheduled posts
+    cron.schedule('0 * * * *', async () => {
       if (this.isRunning) return;
       this.isRunning = true;
 
@@ -175,7 +175,7 @@ class PostScheduler {
         if (results.facebook.postId) {
           story.socialMediaPosts.facebook.postId = results.facebook.postId;
           
-          // Post comment if needed
+          // Post comment if needed - but don't delay the main save
           if (results.facebook.success && results.facebook.needsComment && results.facebook.firstComment) {
             console.log('Scheduling Facebook comment for post:', results.facebook.postId);
             
@@ -187,15 +187,17 @@ class PostScheduler {
                   results.facebook.firstComment
                 );
                 
+                // Update the story in the database separately to avoid race conditions
+                await Story.findByIdAndUpdate(story._id, {
+                  $set: commentResult.success 
+                    ? { 'socialMediaPosts.facebook.commentId': commentResult.commentId }
+                    : { 'socialMediaPosts.facebook.commentError': commentResult.error }
+                });
+                
                 if (commentResult.success) {
                   console.log('Facebook comment posted successfully');
-                  // Update story with comment ID if needed
-                  story.socialMediaPosts.facebook.commentId = commentResult.commentId;
-                  await story.save();
                 } else {
                   console.error('Failed to post Facebook comment:', commentResult.error);
-                  story.socialMediaPosts.facebook.commentError = commentResult.error;
-                  await story.save();
                 }
               } catch (commentError) {
                 console.error('Error posting Facebook comment:', commentError);
@@ -216,7 +218,7 @@ class PostScheduler {
         if (results.instagram.postId) {
           story.socialMediaPosts.instagram.postId = results.instagram.postId;
           
-          // Post comment if needed
+          // Post comment if needed - but don't delay the main save
           if (results.instagram.success && results.instagram.needsComment && results.instagram.firstComment) {
             console.log('Scheduling Instagram comment for post:', results.instagram.postId);
             
@@ -228,15 +230,17 @@ class PostScheduler {
                   results.instagram.firstComment
                 );
                 
+                // Update the story in the database separately to avoid race conditions
+                await Story.findByIdAndUpdate(story._id, {
+                  $set: commentResult.success 
+                    ? { 'socialMediaPosts.instagram.commentId': commentResult.commentId }
+                    : { 'socialMediaPosts.instagram.commentError': commentResult.error }
+                });
+                
                 if (commentResult.success) {
                   console.log('Instagram comment posted successfully');
-                  // Update story with comment ID if needed
-                  story.socialMediaPosts.instagram.commentId = commentResult.commentId;
-                  await story.save();
                 } else {
                   console.error('Failed to post Instagram comment:', commentResult.error);
-                  story.socialMediaPosts.instagram.commentError = commentResult.error;
-                  await story.save();
                 }
               } catch (commentError) {
                 console.error('Error posting Instagram comment:', commentError);
