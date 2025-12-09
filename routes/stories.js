@@ -100,19 +100,34 @@ router.get('/', [
   }
 });
 
-// Get featured stories
+// Get featured stories (most viewed stories)
 router.get('/featured', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 6;
+    const limit = parseInt(req.query.limit) || 10;
     
+    // Get stories with highest view count instead of isFeatured flag
     const stories = await Story.find({ 
       isPublished: true,
-      isFeatured: true 
+      views: { $gt: 0 } // Only include stories that have been viewed
     })
     .populate('author', 'name email')
-    .sort({ createdAt: -1 })
+    .sort({ views: -1, createdAt: -1 }) // Sort by views (highest first), then by creation date
     .limit(limit)
     .select('-socialMediaPosts -content -__v');
+
+    // If we don't have enough viewed stories, fill with latest published stories
+    if (stories.length < limit) {
+      const additionalStories = await Story.find({ 
+        isPublished: true,
+        _id: { $nin: stories.map(s => s._id) } // Exclude already selected stories
+      })
+      .populate('author', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(limit - stories.length)
+      .select('-socialMediaPosts -content -__v');
+
+      stories.push(...additionalStories);
+    }
 
     res.json({
       success: true,
